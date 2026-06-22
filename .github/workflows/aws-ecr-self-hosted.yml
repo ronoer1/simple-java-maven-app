@@ -3,9 +3,7 @@ name: Build and Deploy WeatherApp
 on:
   push:
     branches:
-      - main
-      - master
-      -AWS-Infrastructure
+      - AWS-Infrastructure
 
 env:
   IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/weatherapp
