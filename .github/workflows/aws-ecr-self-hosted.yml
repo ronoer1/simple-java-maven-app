@@ -1,4 +1,4 @@
-name: Build and Deploy WeatherApp to ECR
+name: Build and Deploy Maven App to ECR
 
 on:
   push:
@@ -8,8 +8,11 @@ on:
 env:
   AWS_REGION: us-east-1
   AWS_ACCOUNT_ID: 822417885094
-  ECR_REPOSITORY: weather-app
+
+  ECR_REPOSITORY: maven-app
   ECR_REGISTRY: 822417885094.dkr.ecr.us-east-1.amazonaws.com
+
+  DOCKERHUB_IMAGE: ronoe277/simple-java-maven-app
 
 jobs:
   build-and-deploy:
@@ -34,15 +37,28 @@ jobs:
           aws ecr get-login-password --region $AWS_REGION | \
           docker login --username AWS --password-stdin $ECR_REGISTRY
 
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | \
+          docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
       - name: Build Docker image
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $DOCKERHUB_IMAGE:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $DOCKERHUB_IMAGE:latest
+
       - name: Push Docker image to ECR
         run: |
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Push Docker image to Docker Hub
+        run: |
+          docker push $DOCKERHUB_IMAGE:$IMAGE_TAG
+          docker push $DOCKERHUB_IMAGE:latest
 
       - name: Prepare SSH key
         run: |
@@ -57,13 +73,13 @@ jobs:
 
             docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-            docker stop weatherapp || true
-            docker rm weatherapp || true
+            docker stop maven-app || true
+            docker rm maven-app || true
 
             docker run -d \
-              --name weatherapp \
+              --name maven-app \
               --restart unless-stopped \
-              -p 80:5000 \
+              -p 80:8080 \
               $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
             docker image prune -f
@@ -72,6 +88,6 @@ jobs:
       - name: Verify application is running
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
-            docker ps | grep weatherapp
+            docker ps | grep maven-app
             curl -f http://localhost || exit 1
           EOF
