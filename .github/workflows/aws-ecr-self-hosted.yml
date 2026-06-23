@@ -1,4 +1,4 @@
-name: Build and Deploy Maven App to ECR and Docker
+name: Build and Deploy Maven App to ECR and Docker.
 
 on:
   push:
