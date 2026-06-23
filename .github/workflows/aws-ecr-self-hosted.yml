@@ -1,4 +1,4 @@
-name: Build and Deploy Maven App to ECR and Docker.
+name: Build and Deploy Maven App to ECR and Docker
 
 on:
   push:
@@ -78,16 +78,35 @@ jobs:
 
             docker run -d \
               --name maven-app \
-              --restart unless-stopped \
-              -p 80:8080 \
               $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+            sleep 3
+
+            docker ps -a | grep maven-app
+            docker logs maven-app
+
+            EXIT_CODE=\$(docker inspect maven-app --format='{{.State.ExitCode}}')
+
+            if [ "\$EXIT_CODE" != "0" ]; then
+              echo "Container failed with exit code \$EXIT_CODE"
+              exit 1
+            fi
 
             docker image prune -f
           EOF
 
-      - name: Verify application is running
+      - name: Verify application executed successfully
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
-            docker ps | grep maven-app
-            curl -f http://localhost || exit 1
+            docker ps -a | grep maven-app
+            docker logs maven-app
+
+            EXIT_CODE=\$(docker inspect maven-app --format='{{.State.ExitCode}}')
+
+            if [ "\$EXIT_CODE" != "0" ]; then
+              echo "Container failed with exit code \$EXIT_CODE"
+              exit 1
+            fi
+
+            echo "Maven app container executed successfully"
           EOF
